@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { STATION_INFO, TRAVEL_TIMES } from '../data/mockData';
+import { STATION_INFO } from '../data/mockData';
 
 const NAV_ITEMS = [
   { id: 'junctions', label: 'Junction Status', icon: '⬡' },
@@ -8,13 +8,7 @@ const NAV_ITEMS = [
   { id: 'incidents', label: 'Incident Log', icon: '≡' },
 ];
 
-const travelStatusColor = (status) => {
-  if (status === 'SEVERE') return 'text-red-400';
-  if (status === 'HIGH') return 'text-amber-400';
-  return 'text-yellow-300';
-};
-
-export default function Sidebar({ activePanel, setActivePanel, alertCount }) {
+export default function Sidebar({ activePanel, setActivePanel, alertCount = 0 }) {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -88,32 +82,22 @@ export default function Sidebar({ activePanel, setActivePanel, alertCount }) {
         })}
       </nav>
 
-      {/* Travel times panel */}
+      {/* Live status panel */}
       <div className="px-4 pb-5 pt-3 border-t border-slate-700/60">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-3">Travel Time Index</p>
-        <div className="space-y-2.5">
-          {TRAVEL_TIMES.map((tt, i) => (
-            <div key={i} className="bg-slate-800/70 rounded-lg p-2.5">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] text-slate-300 font-medium leading-tight">
-                  {tt.from} → {tt.to}
-                </span>
-                <span className={`text-[10px] font-bold ${travelStatusColor(tt.status)}`}>
-                  {tt.status}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-white">{tt.current} min</span>
-                <span className="text-xs text-slate-500">vs {tt.normal} min normal</span>
-              </div>
-              <div className="mt-1.5 h-1 bg-slate-700 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${tt.status === 'SEVERE' ? 'bg-red-500' : tt.status === 'HIGH' ? 'bg-amber-500' : 'bg-yellow-400'}`}
-                  style={{ width: `${Math.min((tt.current / (tt.normal * 3)) * 100, 100)}%` }}
-                />
-              </div>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-3">System Status</p>
+        <div className="space-y-2">
+          <div className="bg-slate-800/70 rounded-lg p-3 text-center">
+            <div className="text-xs text-slate-400 mb-1">Active Alerts</div>
+            <div className={`text-2xl font-bold ${alertCount > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+              {alertCount}
             </div>
-          ))}
+          </div>
+          <div className="bg-slate-800/70 rounded-lg p-3 text-center">
+            <div className="text-xs text-slate-400 mb-1">Last Update</div>
+            <div className="text-xs text-slate-300 font-mono">
+              {time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </div>
+          </div>
         </div>
       </div>
     </aside>

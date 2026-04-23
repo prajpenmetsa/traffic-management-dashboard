@@ -1,21 +1,74 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import JunctionStatus from './components/JunctionStatus';
 import DeploymentMap from './components/DeploymentMap';
 import ActiveAlerts from './components/ActiveAlerts';
 import IncidentLog from './components/IncidentLog';
-import { ALERTS } from './data/mockData';
+import { JUNCTIONS, INCIDENTS } from './data/mockData';
+import { calculateAllJunctionsCongestion } from './services/singlePointCongestionService';
+import { generateAlerts } from './services/alertService';
 
 export default function App() {
   const [activePanel, setActivePanel] = useState('junctions');
-  const [alertCount, setAlertCount] = useState(ALERTS.length);
+  const [congestionData, setCongestionData] = useState({});
+  const [alerts, setAlerts] = useState([]);
+  const [isCalculating, setIsCalculating] = useState(false);
+  const updateIntervalRef = useRef(null);
+  const apiKeyRef = useRef(import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
+
+  // Function to update congestion data and generate alerts
+  const updateCongestion = async () => {
+    if (isCalculating) return;
+
+    setIsCalculating(true);
+    try {
+      // Calculate congestion using single-point method (1km offset radius)
+      const congestions = await calculateAllJunctionsCongestion(
+        JUNCTIONS,
+        apiKeyRef.current,
+        1000 // 1km radius around each junction
+      );
+      setCongestionData(congestions);
+
+      // Generate alerts based on congestion data
+      const junctionsWithCongestion = JUNCTIONS.map(j => {
+        const congData = congestions[j.id];
+        const congestionLevel = typeof congData === 'string' ? congData : (congData?.congestion || 'LOW');
+        return {
+          ...j,
+          congestion: congestionLevel,
+        };
+      });
+      const generatedAlerts = generateAlerts(junctionsWithCongestion);
+      setAlerts(generatedAlerts);
+    } catch (error) {
+      console.error('Error updating congestion:', error);
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  // Initialize congestion on mount and set up periodic updates
+  useEffect(() => {
+    // Initial calculation
+    updateCongestion();
+
+    // Set up periodic updates every 4 minutes (240 seconds)
+    updateIntervalRef.current = setInterval(updateCongestion, 4 * 60 * 1000);
+
+    return () => {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
+    };
+  }, []);
 
   const panels = {
-    junctions: <JunctionStatus />,
-    map: <DeploymentMap />,
-    alerts: <ActiveAlerts onAlertCountChange={setAlertCount} />,
-    incidents: <IncidentLog />,
+    junctions: <JunctionStatus congestionData={congestionData} />,
+    map: <DeploymentMap congestionData={congestionData} />,
+    alerts: <ActiveAlerts alerts={alerts} incidents={INCIDENTS} />,
+    incidents: <IncidentLog incidents={INCIDENTS} />,
   };
 
   const panelTitles = {
@@ -30,7 +83,7 @@ export default function App() {
       <Sidebar
         activePanel={activePanel}
         setActivePanel={setActivePanel}
-        alertCount={alertCount}
+        alertCount={alerts.length}
       />
 
       {/* Main column */}

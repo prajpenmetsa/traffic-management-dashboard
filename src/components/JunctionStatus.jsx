@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { JUNCTIONS } from '../data/mockData';
 
 const congestionConfig = {
@@ -14,7 +15,40 @@ function OfficerIcon() {
   );
 }
 
-export default function JunctionStatus() {
+export default function JunctionStatus({ congestionData = {} }) {
+  // Merge calculated congestion with junction data
+  const junctionsWithCongestion = useMemo(() => {
+    return JUNCTIONS.map(junction => {
+      const congData = congestionData[junction.id];
+      const congestionLevel = typeof congData === 'string' ? congData : (congData?.congestion || 'LOW');
+      return {
+        ...junction,
+        congestion: congestionLevel,
+      };
+    });
+  }, [congestionData]);
+
+  // Calculate dynamic summary counts
+  const summary = useMemo(() => {
+    return {
+      low: junctionsWithCongestion.filter(j => j.congestion === 'LOW').length,
+      medium: junctionsWithCongestion.filter(j => j.congestion === 'MEDIUM').length,
+      high: junctionsWithCongestion.filter(j => j.congestion === 'HIGH').length,
+    };
+  }, [junctionsWithCongestion]);
+
+  // Calculate total officers
+  const totalOfficers = useMemo(() => {
+    return JUNCTIONS.reduce((sum, junction) => sum + (junction.officers || 0), 0);
+  }, []);
+
+  // Get current shift based on time
+  const currentShift = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour >= 14 && hour < 22) return 'Afternoon';
+    if (hour >= 22 || hour < 6) return 'Night';
+    return 'Morning';
+  }, []);
   return (
     <div className="p-6">
       {/* Section header */}
@@ -32,8 +66,8 @@ export default function JunctionStatus() {
 
       {/* Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {JUNCTIONS.map((junction) => {
-          const cfg = congestionConfig[junction.congestion];
+        {junctionsWithCongestion.map((junction) => {
+          const cfg = congestionConfig[junction.congestion] || congestionConfig.LOW;
           return (
             <div
               key={junction.id}
@@ -93,27 +127,27 @@ export default function JunctionStatus() {
       {/* Summary bar */}
       <div className="mt-5 bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 flex items-center gap-8">
         <div className="text-center">
-          <div className="text-xl font-bold text-teal-400">3</div>
+          <div className="text-xl font-bold text-teal-400">{summary.low}</div>
           <div className="text-[11px] text-slate-400 mt-0.5">Low Congestion</div>
         </div>
         <div className="w-px h-8 bg-slate-700"></div>
         <div className="text-center">
-          <div className="text-xl font-bold text-amber-400">2</div>
+          <div className="text-xl font-bold text-amber-400">{summary.medium}</div>
           <div className="text-[11px] text-slate-400 mt-0.5">Med. Congestion</div>
         </div>
         <div className="w-px h-8 bg-slate-700"></div>
         <div className="text-center">
-          <div className="text-xl font-bold text-red-400">2</div>
+          <div className="text-xl font-bold text-red-400">{summary.high}</div>
           <div className="text-[11px] text-slate-400 mt-0.5">High Congestion</div>
         </div>
         <div className="w-px h-8 bg-slate-700"></div>
         <div className="text-center">
-          <div className="text-xl font-bold text-white">9</div>
+          <div className="text-xl font-bold text-white">{totalOfficers}</div>
           <div className="text-[11px] text-slate-400 mt-0.5">Officers on Duty</div>
         </div>
         <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 blink inline-block"></span>
-          Data refreshed · Morning Shift
+          Data refreshed · {currentShift} Shift
         </div>
       </div>
     </div>

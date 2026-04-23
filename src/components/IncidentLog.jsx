@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { INCIDENTS, JUNCTIONS } from '../data/mockData';
+import { useState, useEffect } from 'react';
+import { JUNCTIONS } from '../data/mockData';
 
 const severityBadge = {
   HIGH:   'bg-red-500/20 text-red-300 border-red-500/30',
@@ -22,8 +22,8 @@ const SUBTYPES = ['Accident', 'Signal Jump', 'Wrong-Way Driving', 'Vehicle Break
 
 const emptyForm = { type: 'Incident', junction: JUNCTIONS_LIST[0], subtype: 'Accident', severity: 'MEDIUM', note: '' };
 
-export default function IncidentLog() {
-  const [incidents, setIncidents] = useState(INCIDENTS);
+export default function IncidentLog({ incidents: incomingIncidents = [] }) {
+  const [incidents, setIncidents] = useState(incomingIncidents);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
 

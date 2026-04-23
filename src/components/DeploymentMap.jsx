@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { GoogleMap, useJsApiLoader, TrafficLayer, OverlayView } from '@react-google-maps/api';
 import { JUNCTIONS } from '../data/mockData';
 
@@ -55,9 +55,14 @@ const CONGESTION = {
 const OVERLAY_POSITION = (lat, lng) => ({ lat, lng });
 
 function JunctionMarker({ junction, onClick, isSelected }) {
-  const cfg = CONGESTION[junction.congestion];
-  const size = isSelected ? 46 : 38;
+  const cfg = CONGESTION[junction.congestion] || CONGESTION.LOW;
+  const size = isSelected ? 50 : 42;
   const halfSize = size / 2;
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    onClick(junction);
+  };
 
   return (
     <OverlayView
@@ -66,7 +71,7 @@ function JunctionMarker({ junction, onClick, isSelected }) {
       getPixelPositionOffset={() => ({ x: -halfSize, y: -halfSize })}
     >
       <div
-        onClick={() => onClick(junction)}
+        onClick={handleClick}
         title={junction.name}
         style={{
           width: size,
@@ -82,33 +87,32 @@ function JunctionMarker({ junction, onClick, isSelected }) {
           transition: 'all 0.15s ease',
           position: 'relative',
           userSelect: 'none',
+          flexDirection: 'column',
+          gap: '2px',
         }}
       >
+        {/* Congestion level indicator - small badge */}
+        <span style={{
+          fontSize: 9,
+          fontWeight: 900,
+          color: '#0f172a',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          lineHeight: 1,
+        }}>
+          {junction.congestion?.[0] || 'L'}
+        </span>
+
         {/* Officer count or alert icon */}
         <span style={{
           color: '#0f172a',
-          fontSize: junction.officers === 0 ? 14 : 12,
+          fontSize: junction.officers === 0 ? 13 : 11,
           fontWeight: 800,
           fontFamily: 'Inter, system-ui, sans-serif',
           lineHeight: 1,
         }}>
           {junction.officers === 0 ? '!' : junction.officers}
         </span>
-
-        {/* Alert pulse dot */}
-        {junction.alert && (
-          <span style={{
-            position: 'absolute',
-            top: -3,
-            right: -3,
-            width: 11,
-            height: 11,
-            borderRadius: '50%',
-            background: '#f59e0b',
-            border: '1.5px solid #fbbf24',
-            animation: 'blink 1.4s ease-in-out infinite',
-          }} />
-        )}
 
         {/* Selection ring */}
         {isSelected && (
@@ -117,7 +121,7 @@ function JunctionMarker({ junction, onClick, isSelected }) {
             inset: -6,
             borderRadius: '50%',
             border: `2px solid ${cfg.fill}`,
-            opacity: 0.6,
+            opacity: 0.7,
             pointerEvents: 'none',
           }} />
         )}
@@ -128,85 +132,144 @@ function JunctionMarker({ junction, onClick, isSelected }) {
 
 function InfoPanel({ junction, onClose }) {
   if (!junction) return null;
-  const cfg = CONGESTION[junction.congestion];
+  const cfg = CONGESTION[junction.congestion] || CONGESTION.LOW;
+
+  // Get current time in HH:MM format
+  const currentTime = new Date().toLocaleTimeString('en-IN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
 
   return (
     <OverlayView
       position={OVERLAY_POSITION(junction.lat, junction.lng)}
       mapPaneName={OverlayView.FLOAT_PANE}
-      getPixelPositionOffset={() => ({ x: 28, y: -80 })}
+      getPixelPositionOffset={() => ({ x: 28, y: -100 })}
     >
-      <div style={{
-        background: '#1e293b',
-        border: `1px solid ${cfg.border}`,
-        borderRadius: 12,
-        padding: '14px 16px',
-        minWidth: 220,
-        boxShadow: '0 12px 40px rgba(0,0,0,0.7)',
-        fontFamily: 'Inter, system-ui, sans-serif',
-        position: 'relative',
-        zIndex: 9999,
-      }}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#1e293b',
+          border: `2px solid ${cfg.border}`,
+          borderRadius: 14,
+          padding: '16px 18px',
+          minWidth: 240,
+          boxShadow: '0 12px 40px rgba(0,0,0,0.8)',
+          fontFamily: 'Inter, system-ui, sans-serif',
+          position: 'relative',
+          zIndex: 9999,
+        }}>
         {/* Close */}
         <button
           onClick={onClose}
           style={{
             position: 'absolute', top: 8, right: 8,
             background: 'none', border: 'none', cursor: 'pointer',
-            color: '#64748b', fontSize: 16, lineHeight: 1, padding: '2px 4px',
+            color: '#64748b', fontSize: 18, lineHeight: 1, padding: '4px 6px',
+            transition: 'color 0.2s',
           }}
+          onMouseEnter={(e) => e.target.style.color = '#f1f5f9'}
+          onMouseLeave={(e) => e.target.style.color = '#64748b'}
           title="Close"
         >×</button>
 
         {/* Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <span style={{
-            width: 10, height: 10, borderRadius: '50%',
+            width: 12, height: 12, borderRadius: '50%',
             background: cfg.fill, flexShrink: 0, display: 'inline-block',
           }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.3 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', lineHeight: 1.3 }}>
             {junction.name}
           </span>
         </div>
 
         {/* Congestion badge */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
           <span style={{
             background: cfg.bg, color: cfg.fill,
-            border: `1px solid ${cfg.border}`,
-            borderRadius: 20, padding: '2px 10px',
-            fontSize: 11, fontWeight: 700,
+            border: `1.5px solid ${cfg.border}`,
+            borderRadius: 20, padding: '4px 12px',
+            fontSize: 12, fontWeight: 700,
           }}>
             {junction.congestion} CONGESTION
           </span>
-          {junction.alert && (
-            <span style={{
-              background: 'rgba(245,158,11,0.15)', color: '#fbbf24',
-              border: '1px solid rgba(245,158,11,0.4)',
-              borderRadius: 4, padding: '2px 8px',
-              fontSize: 10, fontWeight: 700,
-            }}>⚠ ALERT</span>
-          )}
         </div>
 
         {/* Details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 12 }}>
-          <div style={{ color: junction.officers === 0 ? '#ef4444' : '#93c5fd', fontWeight: 600 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
+          <div style={{
+            color: junction.officers === 0 ? '#ef4444' : '#93c5fd',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}>
+            <span style={{ fontSize: 16 }}>👮</span>
             {junction.officers === 0
-              ? '⚠ No officer assigned'
-              : `👮 ${junction.officers} officer${junction.officers !== 1 ? 's' : ''} on site`}
+              ? 'No officer assigned'
+              : `${junction.officers} officer${junction.officers !== 1 ? 's' : ''} on site`}
           </div>
-          <div style={{ color: '#64748b' }}>🕐 Updated: {junction.lastUpdated}</div>
+
+          {/* Delay time */}
+          {junction.delay !== undefined && (
+            <div style={{
+              color: '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+            }}>
+              <span style={{ fontSize: 14 }}>⏱️</span>
+              <span>
+                Delay: <strong style={{ color: '#fbbf24', fontFamily: 'monospace' }}>
+                  {junction.delay.toFixed(1)}min
+                </strong>
+              </span>
+            </div>
+          )}
+
+          <div style={{
+            color: '#94a3b8',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 12,
+          }}>
+            <span style={{ fontSize: 14 }}>🕐</span>
+            <span>Last update: <strong style={{ color: '#cbd5e1', fontFamily: 'monospace' }}>{currentTime}</strong></span>
+          </div>
         </div>
       </div>
     </OverlayView>
   );
 }
 
-export default function DeploymentMap() {
+export default function DeploymentMap({ congestionData = {} }) {
   const [selectedJunction, setSelectedJunction] = useState(null);
   const [trafficVisible, setTrafficVisible] = useState(true);
   const mapRef = useRef(null);
+
+  // Merge calculated congestion with junction data
+  const junctionsWithCongestion = useMemo(() => {
+    return JUNCTIONS.map(junction => {
+      const congData = congestionData[junction.id];
+      const congestionLevel = typeof congData === 'string' ? congData : (congData?.congestion || 'LOW');
+      return {
+        ...junction,
+        congestion: congestionLevel,
+        delay: typeof congData === 'object' ? (congData?.delay || 0) : 0,
+        speed: typeof congData === 'object' ? (congData?.speed || 0) : 0,
+        freeFlowSpeed: typeof congData === 'object' ? (congData?.freeFlowSpeed || 0) : 0,
+      };
+    });
+  }, [congestionData]);
+
+  // Calculate total officers deployed
+  const totalOfficers = useMemo(() => {
+    return JUNCTIONS.reduce((sum, junction) => sum + (junction.officers || 0), 0);
+  }, []);
 
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const keyMissing = !apiKey || apiKey === 'YOUR_API_KEY_HERE';
@@ -241,8 +304,12 @@ export default function DeploymentMap() {
               <div>VITE_GOOGLE_MAPS_API_KEY=<span className="text-amber-400">AIza…</span></div>
             </div>
             <p className="text-xs text-slate-500 mt-3">
-              Enable <strong className="text-slate-400">Maps JavaScript API</strong> in Google Cloud Console. The Traffic Layer is included — no extra API needed.
+              Enable these APIs in <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">Google Cloud Console</a>:
             </p>
+            <ul className="text-xs text-slate-500 mt-1 text-left list-disc list-inside">
+              <li><strong className="text-slate-400">Maps JavaScript API</strong> (includes Traffic Layer)</li>
+              <li><strong className="text-slate-400">Routes API</strong> (for congestion calculation)</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -299,7 +366,7 @@ export default function DeploymentMap() {
           {trafficVisible && <TrafficLayer autoUpdate />}
 
           {/* Junction markers */}
-          {JUNCTIONS.map(j => (
+          {junctionsWithCongestion.map(j => (
             <JunctionMarker
               key={j.id}
               junction={j}
@@ -330,8 +397,8 @@ export default function DeploymentMap() {
           <p style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
             Monitored Junctions
           </p>
-          {JUNCTIONS.map(j => {
-            const cfg = CONGESTION[j.congestion];
+          {junctionsWithCongestion.map(j => {
+            const cfg = CONGESTION[j.congestion] || CONGESTION.LOW;
             return (
               <div
                 key={j.id}
@@ -350,21 +417,31 @@ export default function DeploymentMap() {
         </div>
 
         {/* Overlay: Officers summary */}
-        <div style={{
-          position: 'absolute', top: 12, left: 12, zIndex: 5,
-          background: 'rgba(15,23,42,0.92)',
-          border: '1px solid rgba(51,65,85,0.8)',
-          borderRadius: 10, padding: '8px 12px',
-          backdropFilter: 'blur(8px)',
-          fontFamily: 'Inter, system-ui, sans-serif',
-          display: 'flex', alignItems: 'center', gap: 8,
-        }}>
-          <svg width="14" height="14" fill="#60a5fa" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
-          </svg>
-          <span style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 600 }}>9 officers deployed</span>
-          <span style={{ fontSize: 11, color: '#475569', borderLeft: '1px solid #334155', paddingLeft: 8, marginLeft: 2 }}>Morning Shift</span>
-        </div>
+        {(() => {
+          const now = new Date();
+          const hour = now.getHours();
+          let shift = 'Morning';
+          if (hour >= 14 && hour < 22) shift = 'Afternoon';
+          else if (hour >= 22 || hour < 6) shift = 'Night';
+
+          return (
+            <div style={{
+              position: 'absolute', top: 12, left: 12, zIndex: 5,
+              background: 'rgba(15,23,42,0.92)',
+              border: '1px solid rgba(51,65,85,0.8)',
+              borderRadius: 10, padding: '8px 12px',
+              backdropFilter: 'blur(8px)',
+              fontFamily: 'Inter, system-ui, sans-serif',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}>
+              <svg width="14" height="14" fill="#60a5fa" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
+              </svg>
+              <span style={{ fontSize: 12, color: '#f1f5f9', fontWeight: 600 }}>{totalOfficers} officer{totalOfficers !== 1 ? 's' : ''} deployed</span>
+              <span style={{ fontSize: 11, color: '#475569', borderLeft: '1px solid #334155', paddingLeft: 8, marginLeft: 2 }}>{shift} Shift</span>
+            </div>
+          );
+        })()}
 
         {/* Overlay: Traffic layer legend */}
         <div style={{

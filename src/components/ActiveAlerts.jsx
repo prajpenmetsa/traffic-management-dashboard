@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ALERTS } from '../data/mockData';
+import { useState, useEffect } from 'react';
 
 const severityConfig = {
   HIGH:   { badge: 'bg-red-500/20 text-red-300 border-red-500/40',    row: 'alert-glow-high',   icon: 'text-red-400',    border: 'border-red-500/25' },
@@ -30,17 +29,23 @@ const alertIcons = {
   ),
 };
 
-export default function ActiveAlerts({ onAlertCountChange }) {
-  const [alerts, setAlerts] = useState(ALERTS);
+export default function ActiveAlerts({ alerts: incomingAlerts = [], incidents = [] }) {
+  const [dismissedAlerts, setDismissedAlerts] = useState(new Set());
   const [dismissing, setDismissing] = useState(null);
+
+  // Filter out dismissed alerts
+  const alerts = incomingAlerts.filter(a => !dismissedAlerts.has(a.id));
+
+  // Update dismissed alerts when incoming alerts change (if it's a new cycle)
+  useEffect(() => {
+    setDismissedAlerts(new Set());
+  }, [incomingAlerts]);
 
   const dismiss = (id) => {
     setDismissing(id);
     setTimeout(() => {
-      const next = alerts.filter(a => a.id !== id);
-      setAlerts(next);
+      setDismissedAlerts(prev => new Set([...prev, id]));
       setDismissing(null);
-      onAlertCountChange?.(next.length);
     }, 300);
   };
 
@@ -130,8 +135,7 @@ export default function ActiveAlerts({ onAlertCountChange }) {
         <div className="mt-4 flex justify-end">
           <button
             onClick={() => {
-              setAlerts([]);
-              onAlertCountChange?.(0);
+              setDismissedAlerts(new Set(incomingAlerts.map(a => a.id)));
             }}
             className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800"
           >
